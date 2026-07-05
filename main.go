@@ -5,6 +5,9 @@ import (
 	"time"
 	"fmt"
 	"sync"
+	"os"
+	"os/signal"
+	"syscall"
 
 	
 
@@ -26,6 +29,21 @@ func main() {
 	)
 	
 	defer cancel()
+
+	signalChan := make(chan os.Signal, 1)
+
+	signal.Notify(
+		signalChan,
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+
+	go func() {
+		<-signalChan
+
+		fmt.Println("\nReceived interrupt signal")
+		cancel()
+	}()
 
 	urls, err := internal.ReadURLs(config.File)
 	if err != nil {
@@ -51,10 +69,15 @@ func main() {
 
 	// Producer
 	go func() {
+		defer close(jobs)
+	
 		for _, url := range urls {
-			jobs <- url
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- url:
+			}
 		}
-		close(jobs)
 	}()
 
 	// Close results after all workers finish
