@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	
 
 	
 
@@ -16,6 +17,7 @@ import (
 	"concurget/internal"
 	"concurget/metrics"
 	"concurget/worker"
+	"concurget/logger"
 
 )
 
@@ -47,7 +49,7 @@ func main() {
 
 	urls, err := internal.ReadURLs(config.File)
 	if err != nil {
-		fmt.Println(err)
+		logger.Error.Println(err)
 		return
 	}
 
@@ -94,14 +96,14 @@ func main() {
 
 		if result.Err != nil {
 			m.Failure++
-			fmt.Println(result.Err)
+			logger.Error.Println(result.Err)
 			continue
 		}
 
 		m.Success++
 		m.Bytes += result.Bytes
 
-		fmt.Printf("Downloaded %s (%d bytes)\n",
+		logger.Info.Printf("Downloaded %s (%d bytes)\n",
 			result.Filename,
 			result.Bytes)
 	}
