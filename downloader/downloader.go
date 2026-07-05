@@ -11,34 +11,69 @@ import (
 
 	//"errors"
 	"fmt"
+	"time"
 )
 
 func Download(ctx context.Context, rawURL string) Result {
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		rawURL,
-		nil,
-	)
-
-	if err != nil {
-		return Result{
-			URL: rawURL,
-			Err: err,
-		}
-	}
-
 	client := &http.Client{}
 
-	resp, err := client.Do(req)
+	const maxRetries = 3
+	
+	var (
+		resp *http.Response
+		err  error
+	)
+	
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+	
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodGet,
+			rawURL,
+			nil,
+		)
+		if err != nil {
+			return Result{
+				URL: rawURL,
+				Err: err,
+			}
+		}
+	
+		resp, err = client.Do(req)
+	
+		// Success
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+	
+		// Close body before retrying
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	
+		// Don't sleep after the last attempt
+		if attempt < maxRetries {
+			fmt.Printf("Retry %d/%d: %s\n", attempt, maxRetries, rawURL)
+			time.Sleep(time.Second)
+		}
+	}
+	
+	// Final failure
 	if err != nil {
 		return Result{
 			URL: rawURL,
 			Err: err,
 		}
 	}
-
+	
+	if resp.StatusCode != http.StatusOK {
+		return Result{
+			URL: rawURL,
+			Err: fmt.Errorf("unexpected status %d", resp.StatusCode),
+		}
+	}
+	
+	defer resp.Body.Close()
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
